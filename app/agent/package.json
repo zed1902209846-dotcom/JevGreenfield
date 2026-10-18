@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "tsx src/unifiedMain.ts",
+    "preview": "tsx scripts/preview.ts",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {

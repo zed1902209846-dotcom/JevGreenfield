@@ -93,6 +93,23 @@ Jev is not a chat model. It takes a JSON `state` plus typed questions and return
 
 ## Try it locally
 
+### Frontend-only preview
+
+The redesigned dashboard supports Chinese / English switching and responsive
+desktop / mobile layouts. To preview the UI without a wallet or API keys:
+
+```bash
+npx --yes pnpm@10.24.0 install --frozen-lockfile
+npx --yes pnpm@10.24.0 --dir app/agent preview
+```
+
+Open http://127.0.0.1:4173/dashboard/. This preview intentionally shows an empty
+state; it does not run forecasts. Use the agent setup below for real data.
+UI labels switch language; research, source material and forecast questions keep
+their original language. Design tokens are documented in `app/agent/DESIGN.md`.
+
+### Full agent
+
 Prerequisites: Node ≥ 22, `bag` (`npm i -g @bnbagent/studio-cli`), an OpenRouter key with credits.
 
 ```bash

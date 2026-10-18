@@ -1,14 +1,16 @@
 /**
  * The /dashboard single-page UI, inlined so the esbuild deploy bundle carries it.
- * Laid out like a trading terminal: market strip on top, candles + volume,
- * a "risk book" where an order book would be, and the Jev forecast where the
- * order ticket would be.
+ * Risk-first bilingual workspace: query, market context, risk horizon and
+ * price history, followed by complete research and analysis tools.
  *
  * Everything rendered from a forecast (questions, news, sources) comes from
  * buyers, LLMs and the web: it is written with textContent only, never
  * innerHTML, and links are restricted to http(s). The page is wrapped in
  * String.raw, so its script must not use template literals.
  */
+
+import { DASHBOARD_LOCALE } from "./dashboardLocale.js";
+import { DASHBOARD_STYLE } from "./dashboardStyle.js";
 
 export const DASHBOARD_PAGE = String.raw`<!doctype html>
 <html lang="en">
@@ -232,12 +234,19 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   .status .grow { flex: 1; }
 
   .tip { position: absolute; pointer-events: none; background: var(--panel2); border: 1px solid var(--line2); border-radius: 4px; padding: 2px 6px; font-size: 11.5px; color: var(--text); white-space: nowrap; z-index: 2; font-variant-numeric: tabular-nums; }
+${DASHBOARD_STYLE}
 </style>
 </head>
 <body>
-<div class="app">
+<a class="skip" href="#analysis">Skip to analysis</a>
+<header class="masthead"><div class="mastinner">
+  <a class="brand" href="#analysis"><b>jev</b><span>Risk Oracle</span></a>
+  <nav aria-label="Main navigation"><a href="#analysis">Risk analysis</a><a href="#history">Forecast history</a></nav>
+  <button class="language" id="language" type="button" aria-label="Switch language">中文 / EN</button>
+</div></header>
+<main class="app" id="analysis">
   <header class="top">
-    <div class="pair"><span class="logo">◆</span><h1 id="pairName">Jev Risk Oracle</h1><span class="tag unknown" id="riskTag">NO DATA</span></div>
+    <div class="pair"><h2 id="pairName">BNB Chain market overview</h2><span class="tag unknown" id="riskTag">NO DATA</span></div>
     <div class="stat"><span class="k">DEX price</span><div class="v num" id="sPrice">—</div></div>
     <div class="stat"><span class="k">Market (CoinGecko)</span><div class="v num" id="sRef">—</div></div>
     <div class="stat"><span class="k">24h change</span><div class="v num" id="sChg">—</div></div>
@@ -248,9 +257,11 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   </header>
 
   <section class="askbar">
+    <h1>See the risk before you trade.</h1>
+    <p class="intro">Research, contract security and market data. One clearer view of your next BNB Chain trade.</p>
     <form class="askrow" id="demo">
-      <label class="askfield"><span class="ico">⌕</span>
-        <input id="req" maxlength="500" autocomplete="off" placeholder="Ask about any BSC token — e.g. “Is CAKE a risky buy right now?” or paste a 0x… contract">
+      <label class="askfield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+        <input id="req" aria-label="Token name or contract address" maxlength="500" autocomplete="off" placeholder="Token name or 0x… contract address">
       </label>
       <button class="cta" id="go" type="submit">Analyze</button>
     </form>
@@ -262,7 +273,20 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
       <button type="button" data-q="Is 0xb5E17933501712485D2EC6662679409006767777 worth buying?">Micro-cap FOMOON</button>
       <button type="button" data-q="Will BNB be above $800 on 2026-11-01?">Will BNB be above $800 on Nov 1?</button>
     </div>
-    <div class="msg" id="msg"></div>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="overview" aria-label="Risk overview">
+    <h2>Risk at a glance</h2>
+    <div class="gauge">
+      <svg id="gauge" viewBox="0 0 288 116" role="img" aria-label="Risk index gauge"></svg>
+      <div class="gaugeLvl" id="gaugeLvl">NO DATA</div>
+      <div class="gaugeSub" id="gaugeSub">0 = low risk · 100 = high risk</div>
+    </div>
+    <p class="riskNote">Lower risk does not mean the price will rise.</p>
+    <div class="outlook"><span>Forecast P(YES)</span><strong id="overviewProb">—</strong></div>
+    <p class="riskNote" id="overviewQuestion">Select a forecast to see its question and probability.</p>
+    <ul class="crit" id="crit"></ul>
   </section>
 
   <section class="chart">
@@ -291,12 +315,6 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
       <button data-tab="secPane">Security</button>
     </div>
     <div data-pane="riskPane" class="bookPane">
-      <div class="gauge">
-        <svg id="gauge" viewBox="0 0 240 136" role="img" aria-label="Risk index gauge"></svg>
-        <div class="gaugeLvl" id="gaugeLvl">NO DATA</div>
-        <div class="gaugeSub" id="gaugeSub">0 = low risk · 100 = high risk</div>
-      </div>
-      <ul class="crit" id="crit"></ul>
       <div class="bookHead"><span>Factor</span><span>Risk</span><span>Weight</span></div>
       <div id="asks"></div>
       <div class="spread"><span>Risk index</span><b id="spreadScore">—</b><span id="spreadCov" class="muted">—</span></div>
@@ -372,7 +390,7 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
     </div>
   </aside>
 
-  <section class="bottom">
+  <section class="bottom" id="history">
     <div class="tabs" data-tabs="bottom">
       <button class="on" data-tab="histPane" id="histTab">Forecasts</button>
       <button data-tab="newsPane">News</button>
@@ -399,14 +417,14 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
     <span>This agent never trades on your behalf</span>
     <span>Jev · DexScreener · GoPlus · CoinGecko · GeckoTerminal</span>
   </footer>
-</div>
+</main>
 
 <script>
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var state = { list: [], sel: 0, pinned: false, demo: false };
-  var C = { up: "#2bb68f", down: "#ed5e75", line: "#1d2b31", muted: "#8b999f", text: "#e2e8ea" };
+  var C = { up: "#187563", down: "#b33d30", line: "#d4e0e3", muted: "#506974", text: "#173f50" };
 
   function el(tag, attrs, text) {
     var n = document.createElement(tag);
@@ -437,9 +455,11 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   document.querySelectorAll("[data-tabs]").forEach(function (bar) {
     var host = bar.parentNode;
     bar.querySelectorAll("button[data-tab]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.classList.contains("on")));
       b.addEventListener("click", function () {
         bar.querySelectorAll("button[data-tab]").forEach(function (o) {
           o.classList.toggle("on", o === b);
+          o.setAttribute("aria-pressed", String(o === b));
           var pane = host.querySelector('[data-pane="' + o.getAttribute("data-tab") + '"]');
           if (pane) pane.hidden = o !== b;
         });
@@ -454,7 +474,7 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   var LEVEL = { low: "LOW RISK", medium: "MEDIUM RISK", high: "HIGH RISK", unknown: "NO DATA" };
   function renderTop(f) {
     var m = f && f.market && !f.market.error ? f.market : null, ref = f && f.reference, r = f && f.risk;
-    $("pairName").textContent = f ? (f.token ? f.token.symbol + "-USD" : "No token") : "Jev Risk Oracle";
+    $("pairName").textContent = f ? (f.token ? f.token.symbol + "-USD" : "No token") : "BNB Chain market overview";
     var lv = (r && r.level) || "unknown", rt = $("riskTag");
     rt.className = "tag " + lv;
     rt.textContent = r && r.score !== null && r.score !== undefined ? "RISK " + r.score + " · " + LEVEL[lv] : LEVEL[lv];
@@ -551,7 +571,7 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
     var last = cs[cs.length - 1], lastCol = last[4] >= last[1] ? C.up : C.down;
     root.appendChild(svg("line", { x1: L, x2: W - R, y1: Y(last[4]), y2: Y(last[4]), stroke: lastCol, "stroke-width": 1, "stroke-dasharray": "2 3" }));
     root.appendChild(svg("rect", { x: W - R + 2, y: Y(last[4]) - 9, width: R - 4, height: 18, rx: 2, fill: lastCol }));
-    var lt = svg("text", { x: W - R + 8, y: Y(last[4]) + 4, "font-size": 11, "font-weight": 600, fill: "#04211d" }); lt.textContent = axisNum(last[4], step); root.appendChild(lt);
+    var lt = svg("text", { x: W - R + 8, y: Y(last[4]) + 4, "font-size": 11, "font-weight": 600, fill: "#ffffff" }); lt.textContent = axisNum(last[4], step); root.appendChild(lt);
 
     var vx = svg("line", { y1: T, y2: H - B, stroke: C.muted, "stroke-width": 1, "stroke-dasharray": "4 4", visibility: "hidden" });
     var hy = svg("line", { x1: L, x2: W - R, stroke: C.muted, "stroke-width": 1, "stroke-dasharray": "4 4", visibility: "hidden" });
@@ -591,30 +611,21 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   }
 
   // ── risk gauge ──
-  // Polar point on the gauge: v in 0..100 maps to 180°..0° (left to right).
-  function gp(v, r) { var a = Math.PI * (1 - v / 100); return [120 + r * Math.cos(a), 122 - r * Math.sin(a)]; }
-  function arc(v0, v1, r) { var a = gp(v0, r), b = gp(v1, r); return "M" + a[0].toFixed(1) + " " + a[1].toFixed(1) + " A" + r + " " + r + " 0 0 1 " + b[0].toFixed(1) + " " + b[1].toFixed(1); }
   function renderGauge(r) {
     var g = $("gauge"); clear(g);
     var score = r && r.score !== null && r.score !== undefined ? r.score : null;
-    var col = score === null ? C.muted : score < 30 ? C.up : score < 60 ? "#e8b34b" : C.down;
-    [[0, 30, C.up], [30, 60, "#e8b34b"], [60, 100, C.down]].forEach(function (b) {
-      g.appendChild(svg("path", { d: arc(b[0] + 0.6, b[1] - 0.6, 92), fill: "none", stroke: b[2], "stroke-opacity": 0.22, "stroke-width": 16 }));
+    var col = score === null ? "#c3d7df" : score < 30 ? "#83d9c1" : score < 60 ? "#f2ca70" : "#ffafa3";
+    [[0, 30, "#83d9c1"], [30, 60, "#f2ca70"], [60, 100, "#ffafa3"]].forEach(function (b) {
+      g.appendChild(svg("rect", { x: b[0] * 2.84, y: 77, width: (b[1] - b[0]) * 2.84 - 3, height: 8, fill: b[2] }));
     });
-    if (score !== null && score > 0) g.appendChild(svg("path", { d: arc(0, Math.max(1, score), 92), fill: "none", stroke: col, "stroke-width": 16, "stroke-linecap": "round" }));
-    // Band edges labelled just outside the arc; the centre stays free for the score.
     [0, 30, 60, 100].forEach(function (v) {
-      var p = gp(v, 110), t = svg("text", { x: p[0], y: p[1] + 4, "text-anchor": v === 0 ? "start" : v === 100 ? "end" : "middle", "font-size": 10, fill: C.muted });
+      var t = svg("text", { x: v * 2.81, y: 108, "text-anchor": v === 0 ? "start" : v === 100 ? "end" : "middle", "font-size": 11, fill: "#c3d7df" });
       t.textContent = v; g.appendChild(t);
     });
-    // A short pointer across the band at the score, not a needle through the number.
-    if (score !== null) {
-      var a = gp(score, 78), b = gp(score, 104);
-      g.appendChild(svg("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "#0f1a1f", "stroke-width": 7, "stroke-linecap": "round" }));
-      g.appendChild(svg("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: C.text, "stroke-width": 3, "stroke-linecap": "round" }));
-    }
-    var n = svg("text", { x: 120, y: 116, "text-anchor": "middle", "font-size": 42, "font-weight": 700, fill: score === null ? C.muted : col });
+    if (score !== null) g.appendChild(svg("line", { x1: Math.min(281, Math.max(2, score * 2.81)), y1: 70, x2: Math.min(281, Math.max(2, score * 2.81)), y2: 91, stroke: "#fff", "stroke-width": 3 }));
+    var n = svg("text", { x: 0, y: 55, "font-size": 56, "font-weight": 650, fill: col });
     n.textContent = score === null ? "—" : score; g.appendChild(n);
+    var denominator = svg("text", { x: 120, y: 54, "font-size": 18, fill: "#c3d7df" }); denominator.textContent = "/ 100"; g.appendChild(denominator);
     $("gaugeLvl").textContent = r ? LEVEL[r.level || "unknown"] : "NO DATA";
     $("gaugeLvl").style.color = col;
     $("gaugeSub").textContent = r ? "data coverage " + Math.round((r.coverage || 0) * 100) + "% · 0 low → 100 high" : "0 = low risk · 100 = high risk";
@@ -675,6 +686,8 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   var MATCH_SHORT = { address: "Your contract", registry: "Official", research: "Unverified", symbol: "Unverified" };
   function renderTicket(f) {
     var fc = f && f.forecast, t = f && f.token;
+    $("overviewProb").textContent = fc ? Math.round(fc.p_yes * 100) + "%" : "—";
+    $("overviewQuestion").textContent = f ? (f.question || f.request || "") : "Select a forecast to see its question and probability.";
     $("pChain").textContent = t ? t.symbol : "BSC"; $("pChain").title = t ? "BSC · " + t.symbol : "";
     var pm = $("pMatch"); pm.textContent = t && t.match ? MATCH_SHORT[t.match] || t.match : "—"; pm.title = t && t.match ? MATCH[t.match] || "" : "";
     pm.style.color = t ? (t.verified ? "var(--up)" : "var(--warn)") : "";
@@ -826,7 +839,7 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
     $("histEmpty").hidden = list.length > 0;
     $("histTab").textContent = "Forecasts (" + list.length + ")";
     list.forEach(function (h, i) {
-      var tr = el("tr", { class: "pick" + (i === state.sel ? " sel" : "") });
+      var tr = el("tr", { class: "pick" + (i === state.sel ? " sel" : ""), tabindex: "0", "aria-label": "Select forecast " + (i + 1), "aria-selected": String(i === state.sel) });
       tr.appendChild(el("td", { class: "num" }, (h.generated_at || "").replace("T", " ").slice(5, 16)));
       tr.appendChild(el("td", null, h.token ? h.token.symbol : "—"));
       tr.appendChild(el("td", { class: "wrap" }, h.question || h.request || ""));
@@ -835,6 +848,7 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
       td.appendChild(tag(sc === null ? "—" : String(sc), sc === null ? "na" : sc < 30 ? "low" : sc < 60 ? "medium" : "high")); tr.appendChild(td);
       tr.appendChild(el("td", { class: "muted" }, h.token && h.token.match ? MATCH[h.token.match] || h.token.match : "—"));
       tr.addEventListener("click", function () { state.sel = i; state.pinned = i !== 0; render(); });
+      tr.addEventListener("keydown", function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); tr.click(); } });
       hist.appendChild(tr);
     });
     var news = $("news"); clear(news);
@@ -858,25 +872,25 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   function msg(text, err) { $("msg").textContent = text || ""; $("msg").className = "msg" + (err ? " err" : ""); }
 
   function load() {
-    return fetch("api/forecasts").then(function (r) { return r.json(); }).then(function (d) {
+    return fetch("api/forecasts").then(function (r) { if (!r.ok) throw new Error("Forecast service unavailable"); return r.json(); }).then(function (d) {
       var prev = state.list.length;
       state.list = d.forecasts || [];
       if (state.pinned && state.list.length > prev) state.sel += state.list.length - prev;
       if (!state.pinned) state.sel = 0;
       $("online").textContent = "Online"; $("online").className = "online";
       render();
-    }).catch(function () { $("online").textContent = "Offline"; $("online").className = "tag bad"; });
+    }).catch(function () { $("online").textContent = "Offline"; $("online").className = "tag bad"; msg("Connection unavailable. Showing the last received data; retrying every 15 seconds.", true); });
   }
 
   function status() {
-    return fetch("api/status").then(function (r) { return r.json(); }).then(function (s) {
+    return fetch("api/status").then(function (r) { if (!r.ok) throw new Error("Status unavailable"); return r.json(); }).then(function (s) {
       $("net").textContent = s.network; $("stNet").textContent = s.network;
       $("wallet").textContent = s.wallet ? s.wallet.slice(0, 6) + "…" + s.wallet.slice(-4) : "—";
       state.demo = !!s.demo;
       setAskEnabled(s.demo);
       if (s.demo) msg("Demo mode · runs without payment · " + s.demo_left + " runs left · ~10 s each, repeats ~1 s");
       else msg("Live seller: buy a forecast over A2A (ERC-8183 job) or pay per request at /x402 — the result appears here.");
-    }).catch(function () {});
+    }).catch(function () { state.demo = false; setAskEnabled(false); msg("Cannot reach the agent. Check the connection and refresh to try again.", true); });
   }
 
   var busy = false;
@@ -914,9 +928,10 @@ export const DASHBOARD_PAGE = String.raw`<!doctype html>
   var resizeTimer;
   window.addEventListener("resize", function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(function () { renderChart(current()); }, 120); });
 
-  status(); load();
+  setAskEnabled(false); render(); status(); load();
   setInterval(load, 15000);
 })();
 </script>
+<script>${DASHBOARD_LOCALE}</script>
 </body>
 </html>`;
